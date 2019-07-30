@@ -10,7 +10,7 @@ package com.nepxion.discovery.common.constant;
  */
 
 public class DiscoveryConstant {
-    public static final String DISCOVERY_VERSION = "5.2.0-SNAPSHOT";
+    public static final String DISCOVERY_VERSION = "5.2.8";
 
     public static final String SPRING_APPLICATION_DISCOVERY_PLUGIN = "spring.application.discovery.plugin";
     public static final String SPRING_APPLICATION_DISCOVERY_VERSION = "spring.application.discovery.version";
@@ -23,6 +23,7 @@ public class DiscoveryConstant {
     public static final String SPRING_APPLICATION_CONFIG_PATH = "spring.application.config.path";
     public static final String SPRING_APPLICATION_GROUP_KEY = "spring.application.group.key";
     public static final String SPRING_APPLICATION_CONTEXT_PATH = "spring.application.context-path";
+    public static final String SPRING_APPLICATION_NO_SERVER_FOUND_NOTIFICATION_ENABLED = "spring.application.no.server.found.notification.enabled";
 
     public static final String CONTEXT_PATH = "server.servlet.context-path";
 
@@ -52,11 +53,16 @@ public class DiscoveryConstant {
     public static final String VERSION_WEIGHT = "version-weight";
     public static final String REGION_WEIGHT = "region-weight";
 
-    public static final String N_D_SERVICE_PREFIX = "n-d-";
+    public static final String N_D_PREFIX = "n-d-";
+    public static final String N_D_SERVICE_PREFIX = "n-d-service";
 
     public static final String N_D_SERVICE_TYPE = "n-d-service-type";
     public static final String N_D_SERVICE_ID = "n-d-service-id";
-    public static final String N_D_GROUP = "n-d-group";
+    public static final String N_D_SERVICE_ADDRESS = "n-d-service-address";
+    public static final String N_D_SERVICE_GROUP = "n-d-service-group";
+    public static final String N_D_SERVICE_VERSION = "n-d-service-version";
+    public static final String N_D_SERVICE_REGION = "n-d-service-region";
+
     public static final String N_D_VERSION = "n-d-version";
     public static final String N_D_REGION = "n-d-region";
     public static final String N_D_ADDRESS = "n-d-address";
@@ -80,6 +86,7 @@ public class DiscoveryConstant {
     public static final String PARTIAL = "partial";
     public static final String OK = "OK";
     public static final String NO = "NO";
-    public static final String UNKNOWN = "UNKNOWN";
+    public static final String DEFAULT = "default";
+    public static final String UNKNOWN = "unknown";
     public static final String EXT = "ext";
 }

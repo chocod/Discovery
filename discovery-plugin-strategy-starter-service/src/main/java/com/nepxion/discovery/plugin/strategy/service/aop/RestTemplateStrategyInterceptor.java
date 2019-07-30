@@ -9,7 +9,6 @@ package com.nepxion.discovery.plugin.strategy.service.aop;
  * @version 1.0
  */
 
-
 import java.io.IOException;
 import java.util.Enumeration;
 import java.util.Iterator;
@@ -19,8 +18,10 @@ import java.util.Map.Entry;
 import javax.servlet.http.HttpServletRequest;
 
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpRequest;
 import org.springframework.http.client.ClientHttpRequestExecution;
@@ -29,27 +30,40 @@ import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import com.nepxion.discovery.common.constant.DiscoveryConstant;
-import com.nepxion.discovery.plugin.strategy.service.constant.ServiceStrategyConstant;
+import com.nepxion.discovery.plugin.strategy.service.adapter.RestTemplateStrategyInterceptorAdapter;
+import com.nepxion.discovery.plugin.strategy.service.route.ServiceStrategyRouteFilter;
 
 public class RestTemplateStrategyInterceptor extends AbstractStrategyInterceptor implements ClientHttpRequestInterceptor {
     private static final Logger LOG = LoggerFactory.getLogger(RestTemplateStrategyInterceptor.class);
+
+    @Autowired(required = false)
+    private List<RestTemplateStrategyInterceptorAdapter> restTemplateStrategyInterceptorAdapterList;
+
+    @Autowired
+    private ServiceStrategyRouteFilter serviceStrategyRouteFilter;
 
     public RestTemplateStrategyInterceptor(String requestHeaders) {
         super(requestHeaders);
 
         LOG.info("------- RestTemplate Intercept Information -------");
-        LOG.info("RestTemplate desires to intercept headers are {}", requestHeaderList);
+        LOG.info("RestTemplate desires to intercept customer headers are {}", requestHeaderList);
         LOG.info("--------------------------------------------------");
     }
 
     @Override
     public ClientHttpResponse intercept(HttpRequest request, byte[] body, ClientHttpRequestExecution execution) throws IOException {
-        printInputRouteHeader();
+        interceptInputHeader();
 
         applyInnerHeader(request);
         applyOuterHeader(request);
 
-        printOutputRouteHeader(request);
+        interceptOutputHeader(request);
+
+        if (CollectionUtils.isNotEmpty(restTemplateStrategyInterceptorAdapterList)) {
+            for (RestTemplateStrategyInterceptorAdapter restTemplateStrategyInterceptorAdapter : restTemplateStrategyInterceptorAdapterList) {
+                restTemplateStrategyInterceptorAdapter.intercept(request, body, execution);
+            }
+        }
 
         return execution.execute(request, body);
     }
@@ -58,14 +72,13 @@ public class RestTemplateStrategyInterceptor extends AbstractStrategyInterceptor
         HttpHeaders headers = request.getHeaders();
         headers.add(DiscoveryConstant.N_D_SERVICE_TYPE, pluginAdapter.getServiceType());
         headers.add(DiscoveryConstant.N_D_SERVICE_ID, pluginAdapter.getServiceId());
-        headers.add(DiscoveryConstant.N_D_GROUP, pluginAdapter.getGroup());
+        headers.add(DiscoveryConstant.N_D_SERVICE_ADDRESS, pluginAdapter.getHost() + ":" + pluginAdapter.getPort());
+        headers.add(DiscoveryConstant.N_D_SERVICE_GROUP, pluginAdapter.getGroup());
+        headers.add(DiscoveryConstant.N_D_SERVICE_VERSION, pluginAdapter.getVersion());
+        headers.add(DiscoveryConstant.N_D_SERVICE_REGION, pluginAdapter.getRegion());
     }
 
     private void applyOuterHeader(HttpRequest request) {
-        if (CollectionUtils.isEmpty(requestHeaderList)) {
-            return;
-        }
-
         ServletRequestAttributes attributes = serviceStrategyContextHolder.getRestAttributes();
         if (attributes == null) {
             return;
@@ -81,31 +94,61 @@ public class RestTemplateStrategyInterceptor extends AbstractStrategyInterceptor
         while (headerNames.hasMoreElements()) {
             String headerName = headerNames.nextElement();
             String headerValue = previousRequest.getHeader(headerName);
-
-            if (requestHeaderList.contains(headerName.toLowerCase())) {
+            boolean isHeaderContains = isHeaderContainsExcludeInner(headerName.toLowerCase());
+            if (isHeaderContains) {
                 headers.add(headerName, headerValue);
+            }
+        }
+
+        if (CollectionUtils.isEmpty(headers.get(DiscoveryConstant.N_D_VERSION))) {
+            String routeVersion = serviceStrategyRouteFilter.getRouteVersion();
+            if (StringUtils.isNotEmpty(routeVersion)) {
+                headers.add(DiscoveryConstant.N_D_VERSION, routeVersion);
+            }
+        }
+        if (CollectionUtils.isEmpty(headers.get(DiscoveryConstant.N_D_REGION))) {
+            String routeRegion = serviceStrategyRouteFilter.getRouteRegion();
+            if (StringUtils.isNotEmpty(routeRegion)) {
+                headers.add(DiscoveryConstant.N_D_REGION, routeRegion);
+            }
+        }
+        if (CollectionUtils.isEmpty(headers.get(DiscoveryConstant.N_D_ADDRESS))) {
+            String routeAddress = serviceStrategyRouteFilter.getRouteAddress();
+            if (StringUtils.isNotEmpty(routeAddress)) {
+                headers.add(DiscoveryConstant.N_D_ADDRESS, routeAddress);
+            }
+        }
+        if (CollectionUtils.isEmpty(headers.get(DiscoveryConstant.N_D_VERSION_WEIGHT))) {
+            String routeVersionWeight = serviceStrategyRouteFilter.getRouteVersionWeight();
+            if (StringUtils.isNotEmpty(routeVersionWeight)) {
+                headers.add(DiscoveryConstant.N_D_VERSION_WEIGHT, routeVersionWeight);
+            }
+        }
+        if (CollectionUtils.isEmpty(headers.get(DiscoveryConstant.N_D_REGION_WEIGHT))) {
+            String routeRegionWeight = serviceStrategyRouteFilter.getRouteRegionWeight();
+            if (StringUtils.isNotEmpty(routeRegionWeight)) {
+                headers.add(DiscoveryConstant.N_D_REGION_WEIGHT, routeRegionWeight);
             }
         }
     }
 
-    private void printOutputRouteHeader(HttpRequest request) {
-        Boolean interceptLogPrint = environment.getProperty(ServiceStrategyConstant.SPRING_APPLICATION_STRATEGY_INTERCEPT_LOG_PRINT, Boolean.class, Boolean.FALSE);
-        if (!interceptLogPrint) {
+    private void interceptOutputHeader(HttpRequest request) {
+        if (!interceptDebugEnabled) {
             return;
         }
 
-        LOG.info("--------- Output Route Header Information --------");
+        System.out.println("------- Intercept Output Header Information ------");
         HttpHeaders headers = request.getHeaders();
         for (Iterator<Entry<String, List<String>>> iterator = headers.entrySet().iterator(); iterator.hasNext();) {
             Entry<String, List<String>> header = iterator.next();
             String headerName = header.getKey();
-            if (headerName.startsWith(DiscoveryConstant.N_D_SERVICE_PREFIX)) {
+            boolean isHeaderContains = isHeaderContains(headerName.toLowerCase());
+            if (isHeaderContains) {
                 List<String> headerValue = header.getValue();
 
-                LOG.info("{}={}", headerName, headerValue);
+                System.out.println(headerName + "=" + headerValue);
             }
         }
-
-        LOG.info("--------------------------------------------------");
+        System.out.println("--------------------------------------------------");
     }
 }

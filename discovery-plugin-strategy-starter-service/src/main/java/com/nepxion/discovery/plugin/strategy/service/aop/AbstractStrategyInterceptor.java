@@ -1,7 +1,5 @@
 package com.nepxion.discovery.plugin.strategy.service.aop;
 
-import java.util.ArrayList;
-
 /**
  * <p>Title: Nepxion Discovery</p>
  * <p>Description: Nepxion Discovery</p>
@@ -11,15 +9,15 @@ import java.util.ArrayList;
  * @version 1.0
  */
 
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 
 import javax.servlet.http.HttpServletRequest;
 
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -30,8 +28,6 @@ import com.nepxion.discovery.plugin.strategy.service.constant.ServiceStrategyCon
 import com.nepxion.discovery.plugin.strategy.service.context.ServiceStrategyContextHolder;
 
 public abstract class AbstractStrategyInterceptor {
-    private static final Logger LOG = LoggerFactory.getLogger(AbstractStrategyInterceptor.class);
-
     @Autowired
     protected ConfigurableEnvironment environment;
 
@@ -41,13 +37,16 @@ public abstract class AbstractStrategyInterceptor {
     @Autowired
     protected ServiceStrategyContextHolder serviceStrategyContextHolder;
 
+    @Value("${" + ServiceStrategyConstant.SPRING_APPLICATION_STRATEGY_REST_INTERCEPT_DEBUG_ENABLED + ":false}")
+    protected Boolean interceptDebugEnabled;
+
     protected List<String> requestHeaderList = new ArrayList<String>();
 
     public AbstractStrategyInterceptor(String requestHeaders) {
         if (StringUtils.isNotEmpty(requestHeaders)) {
             requestHeaderList.addAll(StringUtil.splitToList(requestHeaders.toLowerCase(), DiscoveryConstant.SEPARATE));
         }
-        if (!requestHeaderList.contains(DiscoveryConstant.N_D_VERSION)) {
+        /*if (!requestHeaderList.contains(DiscoveryConstant.N_D_VERSION)) {
             requestHeaderList.add(DiscoveryConstant.N_D_VERSION);
         }
         if (!requestHeaderList.contains(DiscoveryConstant.N_D_REGION)) {
@@ -61,12 +60,11 @@ public abstract class AbstractStrategyInterceptor {
         }
         if (!requestHeaderList.contains(DiscoveryConstant.N_D_REGION_WEIGHT)) {
             requestHeaderList.add(DiscoveryConstant.N_D_REGION_WEIGHT);
-        }
+        }*/
     }
 
-    protected void printInputRouteHeader() {
-        Boolean interceptLogPrint = environment.getProperty(ServiceStrategyConstant.SPRING_APPLICATION_STRATEGY_INTERCEPT_LOG_PRINT, Boolean.class, Boolean.FALSE);
-        if (!interceptLogPrint) {
+    protected void interceptInputHeader() {
+        if (!interceptDebugEnabled) {
             return;
         }
 
@@ -81,15 +79,31 @@ public abstract class AbstractStrategyInterceptor {
             return;
         }
 
-        LOG.info("--------- Input Route Header Information ---------");
+        System.out.println("------- Intercept Input Header Information -------");
         while (headerNames.hasMoreElements()) {
             String headerName = headerNames.nextElement();
-            if (headerName.startsWith(DiscoveryConstant.N_D_SERVICE_PREFIX)) {
+            boolean isHeaderContains = isHeaderContains(headerName.toLowerCase());
+            if (isHeaderContains) {
                 String headerValue = previousRequest.getHeader(headerName);
 
-                LOG.info("{}={}", headerName, headerValue);
+                System.out.println(headerName + "=" + headerValue);
             }
         }
-        LOG.info("--------------------------------------------------");
+        System.out.println("--------------------------------------------------");
+    }
+
+    protected boolean isHeaderContains(String headerName) {
+        return headerName.startsWith(DiscoveryConstant.N_D_PREFIX) || requestHeaderList.contains(headerName);
+    }
+
+    protected boolean isHeaderContainsExcludeInner(String headerName) {
+        return isHeaderContains(headerName) &&
+                !StringUtils.equals(headerName, DiscoveryConstant.N_D_SERVICE_TYPE) &&
+                !StringUtils.equals(headerName, DiscoveryConstant.N_D_SERVICE_ID) &&
+                !StringUtils.equals(headerName, DiscoveryConstant.N_D_SERVICE_ADDRESS) &&
+                !StringUtils.equals(headerName, DiscoveryConstant.N_D_SERVICE_GROUP) &&
+                !StringUtils.equals(headerName, DiscoveryConstant.N_D_SERVICE_VERSION) &&
+                !StringUtils.equals(headerName, DiscoveryConstant.N_D_SERVICE_REGION);
+        // return isHeaderContains(headerName) && !headerName.startsWith(DiscoveryConstant.N_D_SERVICE_PREFIX);
     }
 }
